@@ -29,20 +29,24 @@ const dijkstra = (grid: number[][], start: [number, number], end: [number, numbe
   const distance: Record<string, number> = {}
 
   // setup
+  distance[pointToString(start)] = 0
   grid.forEach((row, y) => {
     row.forEach((_, x) => {
       const point = pointToString([x, y])
-      distance[point] = Number.MAX_SAFE_INTEGER
+      if (point !== pointToString(start)) {
+        distance[point] = Number.MAX_SAFE_INTEGER
+      }
       queue.add(distance[point], point)
     })
   })
-
-  distance[pointToString(start)] = 0
 
   while (queue.length !== 0) {
     const point = queue.remove()
     if (point === undefined) {
       throw new Error('error occurred')
+    }
+    if (point === pointToString(end)) {
+      break
     }
     for (const neighbour of validNeighbours(grid, stringToPoint(point))) {
       const neighbourDistance = distance[point] + 1
