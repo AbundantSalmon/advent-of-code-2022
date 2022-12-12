@@ -1,3 +1,4 @@
+import MinHeap from './heap.ts'
 const inputText = Deno.readTextFileSync('./input.txt')
 const lines = inputText.split('\n')
 
@@ -24,7 +25,7 @@ lines.forEach((line, row_index) => {
 })
 
 const dijkstra = (grid: number[][], start: [number, number], end: [number, number]): number => {
-  const queue: string[] = []
+  const queue = new MinHeap<string>()
   const distance: Record<string, number> = {}
 
   // setup
@@ -32,14 +33,14 @@ const dijkstra = (grid: number[][], start: [number, number], end: [number, numbe
     row.forEach((_, x) => {
       const point = pointToString([x, y])
       distance[point] = Number.MAX_SAFE_INTEGER
-      queue.push(point)
+      queue.add(distance[point], point)
     })
   })
 
   distance[pointToString(start)] = 0
 
   while (queue.length !== 0) {
-    const point = queue.pop()
+    const point = queue.remove()
     if (point === undefined) {
       throw new Error('error occurred')
     }
@@ -48,7 +49,7 @@ const dijkstra = (grid: number[][], start: [number, number], end: [number, numbe
       const neighbourString = pointToString(neighbour)
       if (neighbourDistance < distance[neighbourString]) {
         distance[neighbourString] = neighbourDistance
-        queue.push(neighbourString)
+        queue.add(neighbourDistance, neighbourString)
       }
     }
   }
