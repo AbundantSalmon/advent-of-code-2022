@@ -37,9 +37,17 @@ const squareRock: string[][] = [
   [ROCK, ROCK],
   [ROCK, ROCK],
 ]
-const rocks = [hLineRock, crossRock, lRock, vLineRock, squareRock]
 
-let numberOfRocksDropped = 0
+const rockRecords = {
+  hLineRock: hLineRock,
+  crossRock: crossRock,
+  lRock: lRock,
+  vLineRock: vLineRock,
+  squareRock: squareRock,
+}
+const rocks: (keyof typeof rockRecords)[] = [
+  ...Object.keys(rockRecords),
+] as (keyof typeof rockRecords)[]
 
 const tunnel: Tunnel = [
   [SPACE, SPACE, SPACE, SPACE, SPACE, SPACE, SPACE],
@@ -166,34 +174,103 @@ const putNewRockInTunnel = (tunnel: Tunnel, rockToAdd: string[][], xPos: number,
   })
 }
 
-while (numberOfRocksDropped !== 2022) {
-  const rockToAppear = rocks[numberOfRocksDropped % rocks.length]
-  addSpaceInTunnel(tunnel, rockToAppear)
-  const xy = findXAndYPositionOfRock(tunnel, rockToAppear)
-  let currentX = xy[0]
-  let currentY = xy[1]
-
-  let rockStopped = false
-  while (!rockStopped) {
-    const nextCommand = commands.shift()
-    if (nextCommand === undefined) {
-      throw new Error('command not found')
-    }
-    commands.push(nextCommand) // insert back into the end of commands
-    const newXY = shiftRockCommand(tunnel, nextCommand, rockToAppear, currentX, currentY)
-    const [rockResult, finalXY] = dropRockCommand(tunnel, rockToAppear, newXY[0], newXY[1])
-    rockStopped = rockResult
-    currentX = finalXY[0]
-    currentY = finalXY[1]
-  }
-
-  putNewRockInTunnel(tunnel, rockToAppear, currentX, currentY)
-
-  // tunnel.forEach(row => console.log(row.join('')))
-  ++numberOfRocksDropped
+const heightOfTower = (tunnel: Tunnel) => {
+  const tallestPointIndex = findRowOfHighestStoppedRock(tunnel)
+  const heightOfTower = tunnel.length - tallestPointIndex - 1 // minus the floor
+  return heightOfTower
 }
 
-const tallestPointIndex = findRowOfHighestStoppedRock(tunnel)
-const heightOfTower = tunnel.length - tallestPointIndex - 1 // minus the floor
+function run(numberOfRocks: number, tunnel: Tunnel) {
+  let numberOfRocksDropped = 0
+  let commandIndex = 0
+  const numDroppedVsHeightCache: Record<number, number> = {}
+  const rockIdStartEndCommandCache: string[] = []
+  while (numberOfRocksDropped !== numberOfRocks) {
+    const rockID = rocks[numberOfRocksDropped % rocks.length]
+    const rockToAppear = rockRecords[rockID]
+    addSpaceInTunnel(tunnel, rockToAppear)
+    const xy = findXAndYPositionOfRock(tunnel, rockToAppear)
+    let currentX = xy[0]
+    let currentY = xy[1]
 
-console.log(heightOfTower)
+    let rockStopped = false
+    let commandsForRock = ''
+    while (!rockStopped) {
+      const nextCommand = commands[commandIndex % commands.length]
+      commandsForRock += nextCommand.action
+      commandIndex++
+      const newXY = shiftRockCommand(tunnel, nextCommand, rockToAppear, currentX, currentY)
+      const [rockResult, finalXY] = dropRockCommand(tunnel, rockToAppear, newXY[0], newXY[1])
+      rockStopped = rockResult
+      currentX = finalXY[0]
+      currentY = finalXY[1]
+    }
+
+    putNewRockInTunnel(tunnel, rockToAppear, currentX, currentY)
+
+    ++numberOfRocksDropped
+
+    const tallestPointIndex = findRowOfHighestStoppedRock(tunnel)
+
+    // This is probably a terrible key and only works by chance 😅
+    const rockAndCommands = `${rockID}${commandIndex % commands.length}${commandsForRock}${tunnel[
+      tallestPointIndex
+    ].join('')}${tunnel[tallestPointIndex + 1].join('')}${tunnel[tallestPointIndex + 2]?.join(
+      ''
+    )}${tunnel[tallestPointIndex + 3]?.join('')}`
+    rockIdStartEndCommandCache.push(rockAndCommands)
+    const currentHeightOfTower = heightOfTower(tunnel)
+    numDroppedVsHeightCache[numberOfRocksDropped] = currentHeightOfTower
+
+    const indices = getCycleIndices(rockIdStartEndCommandCache)
+    if (indices !== null ){
+      const rockCyclePeriod = indices[1] - indices[0]
+      const heightChangeOverPeriod =
+        numDroppedVsHeightCache[indices[1] + 1] - numDroppedVsHeightCache[indices[0] + 1]
+
+      const startRock = indices[0] + 1
+      const remainingRocks = numberOfRocks - startRock
+      const remainingPeriods = Math.floor(remainingRocks / rockCyclePeriod)
+      const remainingPeriodHeightChange = remainingPeriods * heightChangeOverPeriod
+      const leftOverRemainingRocks = remainingRocks % rockCyclePeriod
+      const leftOverHeight =
+        numDroppedVsHeightCache[leftOverRemainingRocks + indices[0] + 1] -
+        numDroppedVsHeightCache[indices[0] + 1]
+
+      return numDroppedVsHeightCache[indices[0] + 1] + remainingPeriodHeightChange + leftOverHeight
+    }
+  }
+}
+
+const getCycleIndices = (rockIdStartEndCommandCache: string[], startIndex = 0) => {
+  let tortoiseIndex = startIndex
+  let hareIndex = startIndex + 1
+
+  if (!rockIdStartEndCommandCache[tortoiseIndex] || !rockIdStartEndCommandCache[hareIndex]) {
+    return null
+  }
+  while (rockIdStartEndCommandCache[hareIndex] && rockIdStartEndCommandCache[hareIndex + 1]) {
+    if (
+      rockIdStartEndCommandCache[tortoiseIndex] === undefined ||
+      rockIdStartEndCommandCache[hareIndex] === undefined
+    ) {
+      return null
+    }
+
+    if (rockIdStartEndCommandCache[tortoiseIndex] === rockIdStartEndCommandCache[hareIndex]) {
+      //cycle found
+      return [tortoiseIndex, hareIndex]
+    }
+    tortoiseIndex++
+    hareIndex += 2
+  }
+  return null
+}
+const numOfRuns = 1000000000000
+
+const heightOfOneRun = run(numOfRuns, tunnel)
+
+tunnel.forEach((tunnel, index, array) =>
+  console.log(tunnel.join('') + ' : ' + (array.length - index - 1))
+)
+console.log(heightOfOneRun)
