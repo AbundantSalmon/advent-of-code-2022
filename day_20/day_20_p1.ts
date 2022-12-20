@@ -4,8 +4,6 @@ const lines = inputText.split('\n')
 
 interface NullableValue {
   data: number
-  initialPosition: number
-  //   currentPosition: number
   nextValue: NullableValue | null
   previousValue: NullableValue | null
 }
@@ -14,10 +12,8 @@ interface Value extends NullableValue {
   previousValue: Value
 }
 
-const originalNullablePositions: NullableValue[] = lines.map((line, index) => ({
+const originalNullablePositions: NullableValue[] = lines.map((line) => ({
   data: parseInt(line),
-  initialPosition: index,
-  //   currentPosition: index,
   nextValue: null,
   previousValue: null,
 }))
@@ -38,10 +34,10 @@ for (let i = 0; i < originalNullablePositions.length; ++i) {
 
 const confirmNotNull = (positions: NullableValue[]): Value[] => {
   positions.forEach(value => {
-    if (value.nextValue === null) {
+    if (!value.nextValue) {
       throw new Error('null')
     }
-    if (value.previousValue === null) {
+    if (!value.previousValue) {
       throw new Error('null')
     }
   })
@@ -51,72 +47,85 @@ const confirmNotNull = (positions: NullableValue[]): Value[] => {
 
 const originalPositions = confirmNotNull(originalNullablePositions)
 
-const mutableList = originalPositions.map(value => value)
-
 originalPositions.forEach(value => {
   const valueToMoveBy = value.data
-  const currentPosition = mutableList.findIndex(listValue => listValue === value)
-  const indexToMoveToSigned = (currentPosition + valueToMoveBy) % originalPositions.length
-  const wrapsForward = (currentPosition + valueToMoveBy) / originalPositions.length > 1
-  let indexToMoveTo = indexToMoveToSigned
-  // Probably better logic but works for now
-  if (wrapsForward) {
-    indexToMoveTo = indexToMoveToSigned + 1
-  } else if (indexToMoveToSigned > 0 || valueToMoveBy === 0) {
-    indexToMoveTo = indexToMoveToSigned
-  } else {
-    indexToMoveTo = originalPositions.length - 1 + indexToMoveToSigned
-    if (indexToMoveToSigned === 0) {
-      indexToMoveTo = originalPositions.length - 1
+
+  if (valueToMoveBy > 0) {
+    let valueToMoveAfter = value
+    for (let i = 0; i < valueToMoveBy; ++i) {
+      valueToMoveAfter = valueToMoveAfter.nextValue
+      if (valueToMoveAfter === value) {
+        // technically value is removed before counting, so it needs to skip itself
+        valueToMoveAfter = valueToMoveAfter.nextValue
+      }
     }
+
+    const previousOriginalLocation = value.previousValue
+    const nextOriginalLocation = value.nextValue
+
+    const newPrevious = valueToMoveAfter
+    const newNext = valueToMoveAfter.nextValue
+
+    // disconnect current values position
+    previousOriginalLocation.nextValue = nextOriginalLocation
+    nextOriginalLocation.previousValue = previousOriginalLocation
+
+    // connect up new position
+    value.previousValue = newPrevious
+    value.nextValue = newNext
+
+    newPrevious.nextValue = value
+    newNext.previousValue = value
+  } else if (valueToMoveBy < 0) {
+    let valueToMoveBefore = value
+    for (let i = 0; i < Math.abs(valueToMoveBy); ++i) {
+      valueToMoveBefore = valueToMoveBefore.previousValue
+      if (valueToMoveBefore === value) {
+        // technically value is removed before counting, so it needs to skip itself
+        valueToMoveBefore = valueToMoveBefore.previousValue
+      }
+    }
+
+    const previousOriginalLocation = value.previousValue
+    const nextOriginalLocation = value.nextValue
+
+    const newPrevious = valueToMoveBefore.previousValue
+    const newNext = valueToMoveBefore
+
+    // disconnect current values position
+    previousOriginalLocation.nextValue = nextOriginalLocation
+    nextOriginalLocation.previousValue = previousOriginalLocation
+
+    // connect up new position
+    value.previousValue = newPrevious
+    value.nextValue = newNext
+
+    newPrevious.nextValue = value
+    newNext.previousValue = value
   }
-
-  const valueToMoveAfter = mutableList[indexToMoveTo]
-
-  const previousOriginalLocation = value.previousValue
-  const nextOriginalLocation = value.nextValue
-
-  const newPrevious = valueToMoveAfter
-  const newNext = valueToMoveAfter.nextValue
-
-  // disconnect current values position
-  previousOriginalLocation.nextValue = nextOriginalLocation
-  nextOriginalLocation.previousValue = previousOriginalLocation
-
-  // connect up new position
-  value.previousValue = newPrevious
-  value.nextValue = newNext
-
-  newPrevious.nextValue = value
-  newNext.previousValue = value
-
-  // splice it in
-  mutableList.splice(currentPosition, 1)
-  mutableList.splice(indexToMoveTo, 0, value)
 })
 
-const indexOfZeroValue = mutableList.findIndex(listValue => listValue.data === 0)
+let thousandthValue = -1
+let twoThousandthValue = -1
+let threeThousandthValue = -1
 
-console.log(indexOfZeroValue)
-const thousandthIndex = (indexOfZeroValue + 1000) % mutableList.length
-const twoThousandthIndex = (indexOfZeroValue + 2000) % mutableList.length
-const threeThousandthIndex = (indexOfZeroValue + 3000) % mutableList.length
-console.log(mutableList[thousandthIndex].data)
-console.log(mutableList[twoThousandthIndex].data)
-console.log(mutableList[threeThousandthIndex].data)
-
-let currentValue = mutableList[indexOfZeroValue]
+let currentValue = originalPositions.find(listValue => listValue.data === 0)
+if (currentValue === undefined) {
+  throw new Error('error')
+}
 for (let i = 1; i <= 3000; ++i) {
   currentValue = currentValue.nextValue
-  if (i === 1000 || i === 2000 || i === 3000) {
-    console.log(currentValue.data)
+  if (i === 1000) {
+    thousandthValue = currentValue.data
+  }
+  if (i === 2000) {
+    twoThousandthValue = currentValue.data
+  }
+  if (i === 3000) {
+    threeThousandthValue = currentValue.data
   }
 }
 
-
-const encryptedNumber =
-  mutableList[thousandthIndex].data +
-  mutableList[twoThousandthIndex].data +
-  mutableList[threeThousandthIndex].data
+const encryptedNumber = thousandthValue + twoThousandthValue + threeThousandthValue
 
 console.log(encryptedNumber)
